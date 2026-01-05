@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jadwal Trip Upcoming</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f0f2f5; }
+        h2 { color: #333; text-align: center; margin-bottom: 30px; }
+
+        .accordion {
+            background-color: #ffffff;
+            color: #444;
+            cursor: pointer;
+            padding: 18px;
+            width: 100%;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 16px;
+            transition: 0.4s;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 5px solid #2c3e50;
+        }
+
+        .accordion:hover, .active {
+            background-color: #e6f7ff;
+            border-left: 5px solid #007bff;
+        }
+
+        .badge {
+            background-color: #eee;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            color: #555;
+        }
+
+        .panel {
+            padding: 0 18px;
+            background-color: white;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.2s ease-out;
+            margin-bottom: 10px;
+            border-radius: 0 0 8px 8px;
+        }
+
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 0.95em; }
+        th { text-align: left; background-color: #f8f9fa; color: #666; padding: 10px; border-bottom: 2px solid #ddd; }
+        td { padding: 10px; border-bottom: 1px solid #eee; }
+        
+        .btn-wa {
+            background-color: #25D366;
+            color: white;
+            padding: 6px 12px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+            display: inline-block;
+            transition: background-color 0.3s;
+        }
+        .btn-wa:hover { background-color: #128C7E; }
+
+        #container { max-width: 800px; margin: auto; }
+        #status { text-align: center; color: #777; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <h2>📅 Jadwal Trip Mendatang</h2>
+    <div id="container">
+        <div id="status">Memuat data...</div>
+    </div>
+
+    <script>
+        const urlSpreadsheet = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSR5z3TdydX6DojM-howYBJ1-r_A48qO_rwpk6QLe0rbT6gv_5acHaTZ0GvrGfFiynRYJVcW-HefI4o/pub?output=csv';
+
+        const kolomDicari = [
+            "Tanggal trip", 
+            "Nama", 
+            "wa.me",        
+            "Jumlah peserta"
+        ];
+
+        // --- KAMUS BULAN INDONESIA ---
+        const mapBulan = {
+            "januari": 0, "jan": 0,
+            "februari": 1, "feb": 1,
+            "maret": 2, "mar": 2,
+            "april": 3, "apr": 3,
+            "mei": 4, "may": 4,
+            "juni": 5, "jun": 5,
+            "juli": 6, "jul": 6,
+            "agustus": 7, "agu": 7, "aug": 7,
+            "september": 8, "sep": 8,
+            "oktober": 9, "okt": 9, "oct": 9,
+            "november": 10, "nov": 10,
+            "desember": 11, "des": 11, "dec": 11
+        };
+
+        // --- FUNGSI PARSING KHUSUS INDONESIA ---
+        function parseDateIndo(str) {
+            if (!str) return null;
+            const cleanStr = str.trim().toLowerCase();
+            const parts = cleanStr.split(/[\s-]+/); 
+
+            if (parts.length < 3) return null;
+
+            const day = parseInt(parts[0]);
+            const monthName = parts[1]; 
+            const year = parseInt(parts[2]);
+
+            const monthIndex = mapBulan[monthName];
+
+            if (!isNaN(day) && !isNaN(year) && monthIndex !== undefined) {
+                return new Date(year, monthIndex, day);
+            }
+            return null; 
+        }
+
+        function parseCSV(text) {
+            const rows = [];
+            let currentRow = [];
+            let currentVal = '';
+            let insideQuote = false;
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const nextChar = text[i + 1];
+                if (char === '"') {
+                    if (insideQuote && nextChar === '"') { currentVal += '"'; i++; } 
+                    else { insideQuote = !insideQuote; }
+                } else if (char === ',' && !insideQuote) {
+                    currentRow.push(currentVal); currentVal = '';
+                } else if ((char === '\n' || char === '\r') && !insideQuote) {
+                    if (currentVal || currentRow.length > 0) currentRow.push(currentVal);
+                    if (currentRow.length > 0) rows.push(currentRow);
+                    currentRow = []; currentVal = '';
+                    if (char === '\r' && nextChar === '\n') i++;
+                } else { currentVal += char; }
+            }
+            if (currentVal || currentRow.length > 0) currentRow.push(currentVal);
+            if (currentRow.length > 0) rows.push(currentRow);
+            return rows;
+        }
+
+        async function loadData() {
+            try {
+                const response = await fetch(urlSpreadsheet);
+                const dataRaw = await response.text();
+                const rows = parseCSV(dataRaw);
+                const container = document.getElementById('container');
+                const statusDiv = document.getElementById('status');
+
+                if (rows.length === 0) return;
+
+                const headers = rows[0];
+                let mapIndex = {};
+                let indexTanggal = -1; 
+
+                kolomDicari.forEach(kunci => {
+                    const idx = headers.findIndex(h => h.toLowerCase().includes(kunci.toLowerCase()));
+                    if (idx !== -1) {
+                        mapIndex[kunci] = idx;
+                        if (kunci === "Tanggal trip") indexTanggal = idx;
+                    }
+                });
+
+                if (indexTanggal === -1) {
+                    statusDiv.innerHTML = "Error: Kolom Tanggal tidak ditemukan.";
+                    return;
+                }
+
+                // --- FILTER & GROUPING ---
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                let groups = {};
+
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    const tglString = row[indexTanggal] ? row[indexTanggal].trim() : "";
+                    
+                    if (tglString === "") continue;
+
+                    const tglObj = parseDateIndo(tglString);
+
+                    if (tglObj && !isNaN(tglObj) && tglObj < today) {
+                        continue; 
+                    }
+
+                    if (!groups[tglString]) {
+                        groups[tglString] = {
+                            dateObj: tglObj, 
+                            rows: []
+                        };
+                    }
+                    groups[tglString].rows.push(row);
+                }
+
+                statusDiv.style.display = 'none';
+
+                // --- SORTING ---
+                const sortedKeys = Object.keys(groups).sort((a, b) => {
+                    const dateA = groups[a].dateObj;
+                    const dateB = groups[b].dateObj;
+                    
+                    if (!dateA) return 1; 
+                    if (!dateB) return -1;
+                    return dateA - dateB; 
+                });
+
+                if (sortedKeys.length === 0) {
+                    statusDiv.innerText = "Tidak ada trip mendatang.";
+                    statusDiv.style.display = 'block';
+                    return;
+                }
+
+                // --- RENDER ---
+                sortedKeys.forEach(tglKey => {
+                    const groupData = groups[tglKey];
+                    const pesertaList = groupData.rows;
+                    
+                    let totalPax = 0;
+                    const idxPax = mapIndex["Jumlah peserta"];
+                    pesertaList.forEach(p => {
+                        if (idxPax !== undefined && p[idxPax]) {
+                            let num = parseInt(p[idxPax]);
+                            if (!isNaN(num)) totalPax += num;
+                        }
+                    });
+
+                    const button = document.createElement('button');
+                    button.className = "accordion";
+                    button.innerHTML = `
+                        <strong>🗓️ ${tglKey}</strong> 
+                        <span class="badge">${pesertaList.length} Grup (${totalPax} Pax)</span>
+                    `;
+
+                    const panel = document.createElement('div');
+                    panel.className = "panel";
+
+                    const table = document.createElement('table');
+                    const thead = document.createElement('thead');
+                    const tbody = document.createElement('tbody');
+
+                    const trHead = document.createElement('tr');
+                    kolomDicari.forEach(kunci => {
+                        if (kunci === "Tanggal trip") return;
+                        const th = document.createElement('th');
+                        th.innerText = (kunci === "wa.me") ? "Chat" : kunci;
+                        trHead.appendChild(th);
+                    });
+                    thead.appendChild(trHead);
+
+                    pesertaList.forEach(row => {
+                        const tr = document.createElement('tr');
+                        kolomDicari.forEach(kunci => {
+                            if (kunci === "Tanggal trip") return; 
+                            
+                            const td = document.createElement('td');
+                            const idx = mapIndex[kunci];
+                            let isi = (idx !== undefined && row[idx]) ? row[idx] : "";
+                            
+                            // --- LOGIKA TOMBOL WA + PESAN OTOMATIS + TANGGAL ---
+                            if (kunci === "wa.me") {
+                                // 1. Ambil Data Jumlah Peserta & Nama dari Baris Ini
+                                const idxPax = mapIndex["Jumlah peserta"];
+                                const jumlahPax = (idxPax !== undefined && row[idxPax]) ? row[idxPax] : "-";
+                                
+                                const idxNama = mapIndex["Nama"];
+                                let namaPeserta = (idxNama !== undefined && row[idxNama]) ? row[idxNama] : "Kak";
+
+                                // 2. Bersihkan Format Nomor HP
+                                let cleanNumber = isi.replace(/\D/g, ''); 
+
+                                if (cleanNumber) {
+                                    // Normalisasi nomor Indonesia (08 -> 628, 8 -> 628)
+                                    if (cleanNumber.startsWith('0')) {
+                                        cleanNumber = '62' + cleanNumber.substring(1);
+                                    } else if (cleanNumber.startsWith('8')) {
+                                        cleanNumber = '62' + cleanNumber;
+                                    }
+                                    
+                                    // 3. Buat Template Pesan (MENAMBAHKAN TANGGAL)
+                                    // tglKey adalah tanggal yang diambil dari header grup
+                                    const teksPesan = `Halo Kak ${namaPeserta}, kami dari Admin Canyoning Pacet. 👋
+
+Mengingatkan kembali untuk jadwal trip Canyoning *BESOK, ${tglKey}*.
+Berikut detail pesanan Kakak:
+
+👥 *Total Peserta: ${jumlahPax} Orang*
+📍 *Lokasi Meeting:* Basecamp Pacet
+⏰ *Waktu:* 08.30 WIB ( On Time )
+
+Mohon konfirmasi jika data sudah sesuai. Sampai jumpa besok!`;
+
+                                    // Encode pesan jadi URL
+                                    const pesanEncoded = encodeURIComponent(teksPesan);
+                                    
+                                    // Gunakan API WA yang stabil
+                                    const linkWa = `https://api.whatsapp.com/send?phone=${cleanNumber}&text=${pesanEncoded}`;
+
+                                    td.innerHTML = `<a href="${linkWa}" target="_blank" class="btn-wa">WA</a>`;
+                                } else {
+                                    td.innerText = "-";
+                                }
+                            } else {
+                                td.innerText = isi;
+                            }
+                            tr.appendChild(td);
+                        });
+                        tbody.appendChild(tr);
+                    });
+
+                    table.appendChild(thead);
+                    table.appendChild(tbody);
+                    panel.appendChild(table);
+
+                    container.appendChild(button);
+                    container.appendChild(panel);
+
+                    button.addEventListener("click", function() {
+                        this.classList.toggle("active");
+                        if (panel.style.maxHeight) {
+                            panel.style.maxHeight = null;
+                        } else {
+                            panel.style.maxHeight = panel.scrollHeight + "px";
+                        }
+                    });
+                });
+
+            } catch (error) {
+                console.error(error);
+                document.getElementById('status').innerText = 'Gagal memuat data.';
+            }
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
