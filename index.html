@@ -298,13 +298,12 @@
                                     if (cleanNumber.startsWith('0')) cleanNumber = '62' + cleanNumber.substring(1);
                                     else if (cleanNumber.startsWith('8')) cleanNumber = '62' + cleanNumber;
                                     
-                                    const teksPesan = `Halo Kak ${namaPeserta}, kami dari Admin Canyoning Pacet.\n Terima kasih sudah memilih Trip Bersama TOS Canyoning Pacet \n\nMengingatkan kembali untuk jadwal trip Canyoning *BESOK, ${tglKey}*.\nBerikut detail pesanan Kakak:\n\n *Total Peserta: ${jumlahPax} Orang*\n *Lokasi Meeting:* https://share.google/hRc5JkqW3mjhU2yn9 (Basecamp TOS Adventure Pacet )\n *Waktu:* 08.30 WIB ( On Time )\n\n Untuk perlengkapan yang perlu dibawa:
-                                       \n 1. Baju Ganti
-                                        \n2. Jaket
-                                       \n 3. Sepatu gunung/sepatu olahraga/
+                                    const teksPesan = `Halo Kak ${namaPeserta}, Terima kasih sudah memilih Trip Bersama TOS Canyoning Pacet. \n\nMengingatkan kembali untuk jadwal trip Canyoning *BESOK, ${tglKey}*.\nBerikut detail pesanan Kakak:\n\n *Total Peserta: ${jumlahPax} Orang*\n *Lokasi Meeting:* https://share.google/hRc5JkqW3mjhU2yn9 (Basecamp TOS Adventure Pacet )\n *Waktu:* 08.30 WIB ( On Time )\n\n Untuk perlengkapan yang perlu dibawa:
+                                        1. Baju Ganti
+                                        2. Jaket
+                                        3. Sepatu gunung/sepatu olahraga/
                                         sandal gunung
-                                       \n 4. Obat-obatan pribadi
-
+                                        4. Obat-obatan pribadi
                                        \n\n NB: Jika bayar loket utama masuk kawasan wisata pemandian air panas padusan , Bisa di Refund saat pelunasan di Basecamp \n\n Mohon konfirmasi jika data sudah sesuai. Sampai jumpa besok!`;
                                     
                                     const pesanEncoded = encodeURIComponent(teksPesan);
