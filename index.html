@@ -8,6 +8,41 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f0f2f5; }
         h2 { color: #333; text-align: center; margin-bottom: 30px; }
 
+        /* --- TAMBAHAN STYLE UNTUK SWITCHER --- */
+        .tab-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            background-color: #ddd;
+            color: #555;
+            transition: 0.3s;
+        }
+        .tab-btn.active-tab {
+            background-color: #007bff;
+            color: white;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .tab-content {
+            display: none; /* Sembunyikan konten secara default */
+            animation: fadeIn 0.5s;
+        }
+        .tab-content.active-content {
+            display: block; /* Tampilkan konten aktif */
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        /* ------------------------------------- */
+
         /* --- Header Controls --- */
         .controls { text-align: center; margin-bottom: 20px; }
         .btn-restore {
@@ -51,24 +86,37 @@
         }
         .btn-del:hover { background-color: #cc0000; }
 
-        #container { max-width: 800px; margin: auto; }
-        #status { text-align: center; color: #777; margin-top: 20px; }
+        #container-wrapper { max-width: 800px; margin: auto; }
+        .status { text-align: center; color: #777; margin-top: 20px; }
     </style>
 </head>
 <body>
 
     <h2>📅 Jadwal Trip Mendatang</h2>
 
+    <div class="tab-container">
+        <button class="tab-btn active-tab" onclick="openTab(event, 'jadwal1')">Songkopek</button>
+        <button class="tab-btn" onclick="openTab(event, 'jadwal2')">Coban Canggu</button>
+    </div>
+
     <div class="controls">
         <button onclick="resetHiddenData()" class="btn-restore">🔄 Munculkan Semua Data Terhapus</button>
     </div>
 
-    <div id="container">
-        <div id="status">Memuat data...</div>
+    <div id="container-wrapper">
+        <div id="jadwal1" class="tab-content active-content">
+            <div class="status">Memuat data Songkopek...</div>
+        </div>
+
+        <div id="jadwal2" class="tab-content">
+            <div class="status">Memuat data Coban Canggu...</div>
+        </div>
     </div>
 
     <script>
-        const urlSpreadsheet = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSR5z3TdydX6DojM-howYBJ1-r_A48qO_rwpk6QLe0rbT6gv_5acHaTZ0GvrGfFiynRYJVcW-HefI4o/pub?output=csv';
+        // --- MASUKKAN 2 LINK SPREADSHEET DISINI ---
+        const urlSpreadsheet1 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSR5z3TdydX6DojM-howYBJ1-r_A48qO_rwpk6QLe0rbT6gv_5acHaTZ0GvrGfFiynRYJVcW-HefI4o/pub?output=csv';
+        const urlSpreadsheet2 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRq_DvPn5HBnJ__rVDmJ0vN7Vo9kNqwrrgpeg8diyegbVtaYaNogSIvNSiE25hGACoh4Og55Z7DwEzL/pub?output=csv'; // <-- Ganti ini dengan link kedua
 
         const kolomDicari = [
             "Tanggal trip", 
@@ -77,7 +125,30 @@
             "Jumlah peserta"
         ];
 
-        // --- LOCAL STORAGE LOGIC ---
+        // --- FUNGSI TAB SWITCHER ---
+        function openTab(evt, tabName) {
+            var i, tabContent, tabBtns;
+            
+            // Sembunyikan semua konten
+            tabContent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabContent.length; i++) {
+                tabContent[i].style.display = "none";
+                tabContent[i].classList.remove("active-content");
+            }
+
+            // Hapus class active dari tombol
+            tabBtns = document.getElementsByClassName("tab-btn");
+            for (i = 0; i < tabBtns.length; i++) {
+                tabBtns[i].className = tabBtns[i].className.replace(" active-tab", "");
+            }
+
+            // Tampilkan tab yang dipilih
+            document.getElementById(tabName).style.display = "block";
+            setTimeout(() => { document.getElementById(tabName).classList.add("active-content"); }, 10);
+            evt.currentTarget.className += " active-tab";
+        }
+
+        // --- LOCAL STORAGE LOGIC (Tetap Sama) ---
         const STORAGE_KEY = 'hidden_trips_data';
         
         function getHiddenData() {
@@ -100,7 +171,7 @@
             }
         }
 
-        // Generate ID unik berdasarkan data baris (Tgl + Nama + NoHP)
+        // Generate ID unik
         function generateId(row, mapIndex) {
             const tgl = row[mapIndex["Tanggal trip"]] || "nodate";
             const nama = row[mapIndex["Nama"]] || "noname";
@@ -156,15 +227,21 @@
             return rows;
         }
 
-        async function loadData() {
+        // --- MODIFIKASI: loadData sekarang menerima Parameter URL dan ID Kontainer ---
+        async function loadData(urlTarget, containerId) {
             try {
-                const response = await fetch(urlSpreadsheet);
+                const response = await fetch(urlTarget);
                 const dataRaw = await response.text();
                 const rows = parseCSV(dataRaw);
-                const container = document.getElementById('container');
-                const statusDiv = document.getElementById('status');
+                const container = document.getElementById(containerId); // <-- Target sesuai parameter
+                
+                // Bersihkan tulisan "Memuat data..."
+                container.innerHTML = ""; 
 
-                if (rows.length === 0) return;
+                if (rows.length === 0) {
+                    container.innerHTML = '<div class="status">Data Kosong</div>';
+                    return;
+                }
 
                 const headers = rows[0];
                 let mapIndex = {};
@@ -179,14 +256,11 @@
                 });
 
                 if (indexTanggal === -1) {
-                    statusDiv.innerHTML = "Error: Kolom Tanggal tidak ditemukan.";
+                    container.innerHTML = '<div class="status">Error: Kolom Tanggal tidak ditemukan.</div>';
                     return;
                 }
 
-                // Ambil data yang disembunyikan
                 const hiddenRows = getHiddenData();
-
-                // --- FILTER & GROUPING ---
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
                 let groups = {};
@@ -216,9 +290,6 @@
                     groups[tglString].rows.push(row);
                 }
 
-                statusDiv.style.display = 'none';
-
-                // --- SORTING ---
                 const sortedKeys = Object.keys(groups).sort((a, b) => {
                     const dateA = groups[a].dateObj;
                     const dateB = groups[b].dateObj;
@@ -228,12 +299,11 @@
                 });
 
                 if (sortedKeys.length === 0) {
-                    statusDiv.innerText = "Tidak ada trip mendatang (atau semua telah dihapus).";
-                    statusDiv.style.display = 'block';
+                    container.innerHTML = '<div class="status">Tidak ada trip mendatang (atau semua telah dihapus).</div>';
                     return;
                 }
 
-                // --- RENDER ---
+                // --- RENDER (LOGIKA SAMA PERSIS) ---
                 sortedKeys.forEach(tglKey => {
                     const groupData = groups[tglKey];
                     const pesertaList = groupData.rows;
@@ -301,15 +371,10 @@
                                     const teksPesan = `Halo Kak ${namaPeserta}, Terima kasih sudah memilih Trip Bersama TOS Canyoning Pacet. \n\nMengingatkan kembali untuk jadwal trip Canyoning *BESOK, ${tglKey}*.\nBerikut detail pesanan Kakak:\n\n *Total Peserta: ${jumlahPax} Orang*\n *Lokasi Meeting:* https://share.google/hRc5JkqW3mjhU2yn9 (Basecamp TOS Adventure Pacet )\n *Waktu:* 08.30 WIB ( On Time )\n\nUntuk perlengkapan yang perlu dibawa:\n 1. Baju Ganti\n 2. Jaket\n 3. Sepatu gunung/sepatu olahraga/sandal gunung\n 4. Obat-obatan pribadi\n\nMohon konfirmasi jika data sudah sesuai. Sampai jumpa besok!`;
                                     
                                     const pesanEncoded = encodeURIComponent(teksPesan);
-                                    
-                                    // --- LOGIKA SMART LINK WA (Sekali Klik) ---
                                     let linkWa;
-                                    // Cek apakah user pakai HP atau PC
                                     if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                                        // Jika HP: Pakai wa.me (membuka aplikasi)
                                         linkWa = `https://wa.me/${cleanNumber}?text=${pesanEncoded}`;
                                     } else {
-                                        // Jika PC: Pakai web.whatsapp (langsung ke WA Web)
                                         linkWa = `https://web.whatsapp.com/send?phone=${cleanNumber}&text=${pesanEncoded}`;
                                     }
 
@@ -364,11 +429,14 @@
 
             } catch (error) {
                 console.error(error);
-                document.getElementById('status').innerText = 'Gagal memuat data.';
+                document.getElementById(containerId).innerHTML = '<div class="status">Gagal memuat data.</div>';
             }
         }
 
-        loadData();
+        // PANGGIL FUNGSI UNTUK KEDUA TAB
+        loadData(urlSpreadsheet1, 'jadwal1');
+        loadData(urlSpreadsheet2, 'jadwal2');
+
     </script>
 </body>
 </html>
